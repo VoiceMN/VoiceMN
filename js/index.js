@@ -64,7 +64,11 @@ window.annyangCommands = {
 	"llama :quarter stats": {
 		"regexp": /^llama (January|April|July|October) stats$/, "callback": function (quarter) {
 			appendLog("llama " + quarter + " stats");
+			alert('You Said', quarter);
 		},
+	},
+	"llama alert *text": function (text){
+		alert(text);
 	},
 };
 
