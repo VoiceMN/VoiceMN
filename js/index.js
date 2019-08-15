@@ -6,7 +6,7 @@ function main() {
 	initializeTextarea();
 	setKeys();
 	voice(window.annyangCommands);
-	loadUserCommands(window.userCommands);
+	loadUserCommands();
 }
 
 $(document).ready(main);
@@ -21,6 +21,17 @@ window.storage = new Firestorage("notes");
 // annyang
 // =========================================================
 window.userCommands = {};
+window.commands2 = {
+	"camel show": function() {
+		alert("Camel");
+	},
+	"camel return": function() {
+		logVoice( "camel return");
+		annyang.removeCommands();
+		annyang.addCommands(window.annyangCommands);
+		annyang.addCommands(window.userCommands);
+	}
+};
 window.annyangCommands = {
 	"llama set color :color": function (color) {
 		logVoice("llama set color :color ", color);
@@ -70,6 +81,11 @@ window.annyangCommands = {
 	"llama alert *text": function (text){
 		alert(text);
 	},
+	"llama camel": function() {
+		logVoice( "llama camel" );
+		annyang.removeCommands();
+		annyang.addCommands(window.commands2);
+	}
 };
 
 function voice(commands) {
@@ -466,24 +482,62 @@ class Command {
 	}
 }
 
-function loadCommand(oData, oCommands) {
-	const command = new Command(oData);
-	command.addToId("buttons2");
-	command.addToCommands(oCommands);
+function loadUserCommands() {
+	splitUserCommands().then(function(result) {
+		window.userCommands = result.commands;
+		annyang.addCommands(result.commands);
+		result.buttons.forEach(each => {
+			$("#buttons2").append(each);
+		});
+	});
 }
 
-function loadUserCommands(oCommands) {
-	storage.keys().then(function (keys) {
+function splitUserCommands() {
+	// return a promise that resolves into an object with voice commands and buttons
+	// splitUserCommands().then(function(result) {console.log(result.commands, result.buttons)})
+	return getUserCommands().then(function(arrayOfCommands) {
+		const result = {commands: {}, buttons: []};
+		arrayOfCommands.forEach(each => {
+			result.buttons.push(each.$newButton());
+			each.addToCommands(result.commands);
+		});
+		return result;
+	});
+}
+
+function getUserCommands() {
+	// return a promise that resolves into an array of Command
+	// getUserCommands().then(function(arrayOfCommands) {console.log(arrayOfCommands)})
+	return getCommandPages().then(function(arrayOfText) {
+		return pagesToCommands(arrayOfText);
+	});
+}
+
+function pagesToCommands(asPages) {
+	// return array of Commands
+	return pagesToYamls(asPages).map(each=> new Command(each));
+}
+
+function pagesToYamls(asPages) {
+	// return array of javascript objects (parsed from yaml)
+	arrayOfArrays = asPages.map(each=>pageToYamls(each));
+	return arrayOfArrays.flat();
+}
+
+function pageToYamls(sPage) {
+	// return array of javascript objects (parsed from yaml)
+	return sPage.split("\n===<yaml>===\n").slice(1).map(each => parseYaml(each.trim()));
+}
+
+function getCommandPages(){
+	// return a promise that resolves into an array of pages
+	// getCommandPages().then(function(arrayOfPages) {console.log(arrayOfPages)})
+	return storage.keys().then(function (keys) {
 		const commandKeys = keys.filter(each => each.startsWith("c_"));
 		return Promise.all(commandKeys.map(function (key) {
-			return storage.getItem(key).then(function (text) {
-				const yamls = text.split("\n===<yaml>===\n").slice(1).map(each => parseYaml(each.trim()));
-				yamls.forEach(each => loadCommand(each, oCommands));
-			});
+			return storage.getItem(key);
 		}));
-	}).then(function () {
-		annyang.addCommands(oCommands);
-	});
+	})
 }
 
 // =========================================================
